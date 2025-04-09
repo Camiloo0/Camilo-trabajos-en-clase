@@ -1,0 +1,75 @@
+import os
+import re
+import requests
+
+def extractFromRegularExpresion(regex, file):
+    if file:
+        with open(file, "rt", encoding="utf-8", errors="ignore") as f:
+            data = f.read()
+        return re.findall(regex, data)
+    return []
+
+def getIPInfo(ip):
+    try:
+        res = requests.get(f"http://ip-api.com/json/{ip}")
+        datos = res.json()
+        return datos.get("country", "Desconocido") # Se intenta obtener el país desde el JSON, si no está, se devuelve "Desconocido"
+    except: # se hace como excepcion del erroe, si ocurre cualquier error, se devuelve "Error"
+        return "Error"
+
+def analizarCodigo(codigo):
+    codigo = int(codigo)
+    if codigo == 401:
+        return "Intento fallido de inicio de sesión"
+    elif codigo == 403:
+        return "Acceso bloqueado (posible firewall)"
+    elif codigo == 404:
+        return "Acceso inusual o solicitud sospechosa"
+    elif 500 <= codigo <= 599:
+        return "Posibles alertas de seguridad"
+    return None
+
+# Expresión regular para sacar los datos que quiero (Varia dependiendo)
+regex = r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*?\b[A-Z]{3,7}\b\s(.*?)\s.*?(\d{3})"
+carpeta = "C:\\Users\\USUARIO\\Downloads\\Catpetas Log" # Carpeta con archivos
+
+# Lista final de resultados
+lista_resultado = []
+
+for archivo in os.listdir(carpeta): # Recorre todos los archivos que hay dentro de la carpeta especificada
+    # el "os.listdir" sirve para listar los nombres de todos los archivos y carpetas dentro de un directorio específico.
+    ruta = os.path.join(carpeta, archivo)   # Verifica que realmente sea un archivo (y no una carpeta u otro elemento)
+    if os.path.isfile(ruta):
+        print(f"\nProcesando archivo: {archivo}")
+        datos = extractFromRegularExpresion(regex, ruta)
+
+        if not datos:
+            print("No se encontraron datos.")
+            continue
+
+        procesadas = []
+
+        for ip, path, codigo in datos:
+            if ip in procesadas:
+                continue
+            procesadas.append(ip)
+
+            descripcion = analizarCodigo(codigo)
+            if not descripcion:
+                continue
+
+            pais = getIPInfo(ip)
+
+            item = {
+                "ip": ip,
+                "pais": pais,
+                "codigo": int(codigo),
+                "error": descripcion
+            }
+            lista_resultado.append(item)
+
+        # Mostrar los resultados de forma organizada
+        print(f"{'IP':<18} {'País':<20} {'Código':<8} {'Tipo de Error'}")
+        print("-" * 70)
+        for item in lista_resultado:
+            print(f"{item['ip']:<18} {item['pais']:<20} {item['codigo']:<8} {item['error']}")
